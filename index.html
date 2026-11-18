@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Siperpus Pro - Smart Library Ultimate</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #4b545c; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #6c757d; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="bg-[#f4f6f9] text-gray-800 font-sans h-screen overflow-hidden flex">
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast-container" class="fixed top-4 right-4 z-[9999] flex flex-col space-y-2"></div>
+
+    <!-- CUSTOM CONFIRM MODAL -->
+    <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-50 z-[9999] hidden flex items-center justify-center fade-in">
+        <div class="bg-white rounded-sm shadow-lg w-96 overflow-hidden border-t-4 border-red-600">
+            <div class="p-4">
+                <h3 class="text-lg font-bold text-gray-800 mb-2" id="modal-title">Konfirmasi Tindakan</h3>
+                <p id="confirm-message" class="text-sm text-gray-600">Apakah Anda yakin?</p>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 border-t border-gray-200 flex justify-end space-x-2">
+                <button onclick="closeConfirmModal()" class="px-4 py-2 bg-white border border-gray-300 rounded-sm text-sm hover:bg-gray-100">Batal</button>
+                <button id="confirm-btn" class="px-4 py-2 bg-red-600 text-white rounded-sm text-sm hover:bg-red-700">Ya, Hapus</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PUBLIC CATALOG SCREEN -->
+    <div id="public-view" class="fixed inset-0 bg-gray-50 flex flex-col z-50 hidden">
+        <nav class="bg-[#343a40] text-white h-14 flex items-center justify-between px-4 sm:px-6 flex-shrink-0 shadow-md">
+            <div class="flex items-center space-x-2">
+                <i class="fas fa-book-open text-[#007bff] text-xl"></i>
+                <span class="text-xl font-light tracking-wide hidden sm:block">SIPERPUS <span class="font-bold">PRO</span></span>
+            </div>
+            <button onclick="switchAppMode('login')" class="bg-[#007bff] hover:bg-[#0056b3] text-white px-4 py-1.5 rounded-sm text-sm font-medium transition-colors shadow-sm">
+                <i class="fas fa-sign-in-alt mr-1"></i> Login
+            </button>
+        </nav>
+        <div class="bg-[#007bff] py-10 px-4 sm:px-6 flex flex-col items-center justify-center text-white flex-shrink-0 relative overflow-hidden">
+            <h1 class="text-3xl md:text-4xl font-bold mb-3 text-center z-10">OPAC - Online Public Access Catalog</h1>
+            <p class="mb-6 text-blue-100 text-center max-w-xl text-sm md:text-base z-10">Cari koleksi buku, jurnal, e-book, dan referensi digital.</p>
+            <div class="relative w-full max-w-2xl text-gray-800 z-10">
+                <input type="text" id="public-search" onkeyup="handlePublicSearch(this.value)" placeholder="Pencarian cepat judul, pengarang, ISBN..." class="w-full pl-12 pr-4 py-3 rounded-full shadow-lg border-0 focus:outline-none focus:ring-2 focus:ring-blue-300 text-base">
+                <i class="fas fa-search absolute left-5 top-4 text-gray-400 text-lg"></i>
+            </div>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 custom-scrollbar">
+            <div class="max-w-7xl mx-auto">
+                <div class="flex items-center justify-between mb-6 border-b border-gray-200 pb-2">
+                    <h2 class="text-xl font-bold text-gray-800">Koleksi <span class="font-light text-gray-500">Terbaru</span></h2>
+                </div>
+                <div id="public-katalog-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                    <!-- Injected via Supabase -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOGIN SCREEN -->
+    <div id="login-view" class="fixed inset-0 bg-[#e9ecef] flex items-center justify-center z-50 hidden">
+        <div class="max-w-md w-full bg-white shadow-md border-t-4 border-[#007bff] rounded-sm overflow-hidden fade-in">
+            <div class="p-6 text-center border-b border-gray-100">
+                <i class="fas fa-book-open text-4xl text-[#007bff] mb-3"></i>
+                <h2 class="text-2xl font-bold text-gray-800 uppercase tracking-wider">SIPERPUS <span class="font-light">PRO</span></h2>
+                <p class="text-gray-500 text-sm">Sistem Informasi Perpustakaan Terpadu</p>
+            </div>
+            <div class="p-6 bg-[#f8f9fa]">
+                <form id="login-form" class="space-y-4">
+                    <div>
+                        <input type="text" id="login-user" required class="w-full px-3 py-2 border border-gray-300 rounded-sm focus:ring-1 focus:ring-[#007bff] outline-none" placeholder="Username" autocomplete="off">
+                    </div>
+                    <div>
+                        <input type="password" id="login-pass" required class="w-full px-3 py-2 border border-gray-300 rounded-sm focus:ring-1 focus:ring-[#007bff] outline-none" placeholder="Password" autocomplete="new-password">
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <label class="flex items-center text-sm text-gray-600 cursor-pointer">
+                            <input type="checkbox" class="mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500"> Remember Me
+                        </label>
+                    </div>
+                    <button type="submit" id="btn-login" class="w-full bg-[#007bff] hover:bg-[#0056b3] text-white font-bold py-2 px-6 rounded-sm transition-colors shadow-sm">
+                        Masuk
+                    </button>
+                    <div class="mt-4 pt-4 border-t border-gray-100 text-center">
+                        <button type="button" onclick="switchAppMode('public')" class="text-sm text-[#007bff] hover:underline font-medium">&larr; OPAC / Katalog Publik</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP SCREEN (Admin) -->
+    <div id="app-view" class="hidden w-full h-full flex flex-col md:flex-row">
+        <!-- SIDEBAR -->
+        <aside id="sidebar" class="w-64 h-full bg-[#343a40] flex flex-col shadow-xl flex-shrink-0 z-40 transition-transform duration-300 absolute md:relative -translate-x-full md:translate-x-0">
+            <div class="h-14 flex items-center px-4 border-b border-[#4b545c] bg-[#343a40]">
+                <i class="fas fa-book-open text-blue-400 mr-3 text-lg"></i>
+                <span class="text-xl font-light text-white tracking-wide">SIPERPUS <span class="font-bold">PRO</span></span>
+            </div>
+            <div class="px-4 py-4 border-b border-[#4b545c] flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-full bg-[#007bff] flex items-center justify-center text-white font-bold border-2 border-[#4b545c]" id="sidebar-user-avatar">AD</div>
+                <div>
+                    <p class="text-gray-200 text-sm font-semibold" id="sidebar-user-name">Administrator</p>
+                    <p class="text-green-400 text-xs flex items-center"><span class="w-2 h-2 rounded-full bg-green-400 mr-1"></span> Online</p>
+                </div>
+            </div>
+            <nav id="sidebar-nav" class="flex-1 overflow-y-auto py-2 custom-scrollbar text-sm space-y-1">
+                <!-- Injected via JS -->
+            </nav>
+        </aside>
+
+        <!-- CONTENT AREA -->
+        <main class="flex-1 flex flex-col h-full overflow-hidden bg-[#f4f6f9]">
+            <!-- Top Navbar -->
+            <header class="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4 shadow-sm z-30 flex-shrink-0">
+                <div class="flex items-center">
+                    <button onclick="toggleSidebar()" class="text-gray-500 hover:text-gray-700 mr-4 md:hidden"><i class="fas fa-bars text-lg"></i></button>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button onclick="logout()" class="flex items-center space-x-1 text-sm font-medium text-gray-600 hover:text-red-600 transition-colors">
+                        <i class="fas fa-sign-out-alt"></i> <span class="hidden sm:inline">Keluar</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <div class="flex-1 overflow-y-auto p-4 sm:p-6" id="main-content">
+                <div class="mb-4 flex items-center justify-between">
+                    <h1 id="page-title" class="text-2xl font-normal text-gray-800">Dashboard Interaktif</h1>
+                    <span id="breadcrumb" class="text-sm text-gray-500 hidden sm:block">Beranda / Dashboard</span>
+                </div>
+
+                <!-- DASHBOARD VIEW -->
+                <div id="dashboard-view" class="fade-in space-y-6">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-[#17a2b8] rounded-sm shadow-sm p-4 text-white relative overflow-hidden">
+                            <h3 id="stat-koleksi" class="text-3xl font-bold mb-1">...</h3><p class="text-sm">Total Koleksi (Judul)</p>
+                            <i class="fas fa-book absolute -right-2 -bottom-2 text-6xl opacity-20"></i>
+                        </div>
+                        <div class="bg-[#28a745] rounded-sm shadow-sm p-4 text-white relative overflow-hidden">
+                            <h3 id="stat-eksemplar" class="text-3xl font-bold mb-1">...</h3><p class="text-sm">Total Eksemplar</p>
+                            <i class="fas fa-copy absolute -right-2 -bottom-2 text-6xl opacity-20"></i>
+                        </div>
+                        <div class="bg-[#ffc107] rounded-sm shadow-sm p-4 text-gray-900 relative overflow-hidden">
+                            <h3 id="stat-anggota" class="text-3xl font-bold mb-1">...</h3><p class="text-sm">Anggota Aktif</p>
+                            <i class="fas fa-users absolute -right-2 -bottom-2 text-6xl opacity-20"></i>
+                        </div>
+                        <div class="bg-[#dc3545] rounded-sm shadow-sm p-4 text-white relative overflow-hidden">
+                            <h3 class="text-3xl font-bold mb-1">-</h3><p class="text-sm">Buku Dipinjam</p>
+                            <i class="fas fa-hand-holding-heart absolute -right-2 -bottom-2 text-6xl opacity-20"></i>
+                        </div>
+                        <div class="bg-indigo-500 rounded-sm shadow-sm p-4 text-white relative overflow-hidden">
+                            <h3 class="text-3xl font-bold mb-1">-</h3><p class="text-sm">Buku Rusak / Hilang</p>
+                            <i class="fas fa-heart-broken absolute -right-2 -bottom-2 text-6xl opacity-20"></i>
+                        </div>
+                        <div class="bg-teal-500 rounded-sm shadow-sm p-4 text-white relative overflow-hidden">
+                            <h3 class="text-3xl font-bold mb-1">-</h3><p class="text-sm">Pengunjung Hari Ini</p>
+                            <i class="fas fa-walking absolute -right-2 -bottom-2 text-6xl opacity-20"></i>
+                        </div>
+                        <div class="bg-orange-500 rounded-sm shadow-sm p-4 text-white relative overflow-hidden">
+                            <h3 class="text-3xl font-bold mb-1">-</h3><p class="text-sm">Poin Literasi</p>
+                            <i class="fas fa-star absolute -right-2 -bottom-2 text-6xl opacity-20"></i>
+                        </div>
+                        <div class="bg-blue-600 rounded-sm shadow-sm p-4 text-white relative overflow-hidden">
+                            <h3 class="text-3xl font-bold mb-1">-</h3><p class="text-sm">Buku Digital (E-Book)</p>
+                            <i class="fas fa-tablet-alt absolute -right-2 -bottom-2 text-6xl opacity-20"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DYNAMIC CRUD VIEW -->
+                <div id="dynamic-view" class="hidden h-[calc(100%-3rem)] fade-in">
+                    <div class="bg-white shadow-sm border-t-4 border-[#007bff] rounded-sm flex flex-col h-full">
+                        <div class="border-b border-gray-200 p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0">
+                            <div class="flex items-center space-x-2 text-gray-700">
+                                <i id="module-icon" class="fas fa-table"></i>
+                                <h2 id="module-title" class="text-lg font-semibold uppercase tracking-wide">Data Table</h2>
+                            </div>
+                            <div class="flex space-x-1" id="toolbar-buttons"></div>
+                        </div>
+                        <div id="dynamic-content" class="flex-1 overflow-y-auto bg-white p-4"></div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. KREDENSIAL SUPABASE
+        // ==========================================
+        const SUPABASE_URL = 'https://kxvoawgmsnbihsbvzlnj.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_OElXcLKyIDclPp8seqaKUA_s_2E5Bh9';
+        var supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // ==========================================
+        // 2. FULL SCHEMA CONFIGURATION (35 MODULES)
+        // ==========================================
+        const SCHEMAS = {
+            dashboard: { title: 'Dashboard', icon: 'fa-tachometer-alt' },
+            profil: {
+                title: 'Profil Perpustakaan', icon: 'fa-building', tableName: 'profil',
+                sections: [{ title: 'Informasi Institusi', fields: [
+                    { label: 'Nama Perpustakaan', db_field: 'nama_perpustakaan', type: 'text' },
+                    { label: 'Nama Sekolah', db_field: 'nama_sekolah', type: 'text' },
+                    { label: 'NPSN', db_field: 'npsn', type: 'text' },
+                    { label: 'NSS', db_field: 'nss', type: 'text' },
+                    { label: 'Kepala Sekolah', db_field: 'kepala_sekolah', type: 'text' },
+                    { label: 'Kepala Perpustakaan', db_field: 'kepala_perpustakaan', type: 'text' },
+                    { label: 'Alamat Lengkap', db_field: 'alamat', type: 'textarea' },
+                    { label: 'Email', db_field: 'email', type: 'text' },
+                    { label: 'Website', db_field: 'website', type: 'text' },
+                    { label: 'Telepon/WA', db_field: 'telepon', type: 'text' }
+                ]}]
+            },
+            pengguna: {
+                title: 'Data Pengguna / Admin', icon: 'fa-user-shield', tableName: 'users',
+                sections: [{ title: 'Akun & Akses', fields: [
+                    { label: 'Nama Lengkap', db_field: 'nama_lengkap', type: 'text' }, 
+                    { label: 'Username', db_field: 'username', type: 'text' },
+                    { label: 'Password', db_field: 'password', type: 'password' }, 
+                    { label: 'Email', db_field: 'email', type: 'text' },
+                    { label: 'Jabatan', db_field: 'jabatan', type: 'text' },
+                    { label: 'Hak Akses', db_field: 'role', type: 'select', options: ['Administrator', 'Kepala Sekolah', 'Petugas'] },
+                    { label: 'Status', db_field: 'status', type: 'select', options: ['Aktif', 'Non-Aktif'] }
+                ]}]
+            },
+            anggota: {
+                title: 'Manajemen Anggota', icon: 'fa-id-card', tableName: 'anggota',
+                sections: [
+                    { title: 'Identitas Pribadi', fields: [
+                        { label: 'Nomor Anggota / Barcode', db_field: 'nomor_anggota', type: 'text' }, 
+                        { label: 'Nama Lengkap', db_field: 'nama_lengkap', type: 'text' },
+                        { label: 'NIS/NISN/NIK', db_field: 'nis_nisn', type: 'text' }, 
+                        { label: 'Tempat Lahir', db_field: 'tempat_lahir', type: 'text' },
+                        { label: 'Tanggal Lahir', db_field: 'tanggal_lahir', type: 'date' },
+                        { label: 'Jenis Kelamin', db_field: 'jenis_kelamin', type: 'select', options: ['Laki-laki', 'Perempuan'] },
+                        { label: 'Agama', db_field: 'agama', type: 'text' },
+                        { label: 'No HP / WhatsApp', db_field: 'no_hp', type: 'text' },
+                        { label: 'Alamat', db_field: 'alamat', type: 'textarea' }
+                    ]},
+                    { title: 'Data Sekolah & Status', fields: [
+                        { label: 'Jenjang / Kelas', db_field: 'kelas', type: 'text' }, 
+                        { label: 'Jurusan', db_field: 'jurusan', type: 'text' }, 
+                        { label: 'Status', db_field: 'status', type: 'select', options: ['Aktif', 'Lulus', 'Pindah', 'Alumni'] }
+                    ]}
+                ]
+            },
+            guru: {
+                title: 'Data Guru', icon: 'fa-chalkboard-teacher', tableName: 'guru',
+                sections: [{ title: 'Identitas Guru', fields: [
+                    { label: 'NIP', db_field: 'nip', type: 'text' },
+                    { label: 'Nama Lengkap', db_field: 'nama', type: 'text' },
+                    { label: 'Mata Pelajaran', db_field: 'mata_pelajaran', type: 'text' },
+                    { label: 'No HP', db_field: 'no_hp', type: 'text' },
+                    { label: 'Alamat', db_field: 'alamat', type: 'textarea' }
+                ]}]
+            },
+            penerbit: {
+                title: 'Data Penerbit', icon: 'fa-print', tableName: 'penerbit',
+                sections: [{ title: 'Informasi Penerbit', fields: [
+                    { label: 'Nama Penerbit', db_field: 'nama_penerbit', type: 'text' },
+                    { label: 'Kota', db_field: 'kota', type: 'text' },
+                    { label: 'Email/Website', db_field: 'kontak', type: 'text' }
+                ]}]
+            },
+            penulis: {
+                title: 'Data Penulis', icon: 'fa-pen-nib', tableName: 'penulis',
+                sections: [{ title: 'Informasi Penulis', fields: [
+                    { label: 'Nama Penulis', db_field: 'nama_penulis', type: 'text' },
+                    { label: 'Gelar', db_field: 'gelar', type: 'text' },
+                    { label: 'Biografi Singkat', db_field: 'biografi', type: 'textarea' }
+                ]}]
+            },
+            kategori: { 
+                title: 'Data Kategori', icon: 'fa-tags', tableName: 'kategori', 
+                sections: [{ title: 'Kategori Koleksi', fields: [
+                    { label: 'Kode Kategori', db_field: 'kode_kategori', type: 'text' }, 
+                    { label: 'Nama Kategori', db_field: 'nama_kategori', type: 'text' },
+                    { label: 'Deskripsi', db_field: 'deskripsi', type: 'textarea' }
+                ]}] 
+            },
+            rak: {
+                title: 'Data Rak & Lokasi', icon: 'fa-server', tableName: 'rak',
+                sections: [{ title: 'Pemetaan Lokasi', fields: [
+                    { label: 'Kode Rak / Ruangan', db_field: 'kode_rak', type: 'text' },
+                    { label: 'Lantai / Gedung', db_field: 'lokasi', type: 'text' },
+                    { label: 'Keterangan', db_field: 'keterangan', type: 'textarea' }
+                ]}]
+            },
+            bahasa: {
+                title: 'Data Bahasa', icon: 'fa-language', tableName: 'bahasa',
+                sections: [{ title: 'Bahasa Buku', fields: [
+                    { label: 'Kode Bahasa', db_field: 'kode_bahasa', type: 'text' },
+                    { label: 'Nama Bahasa', db_field: 'nama_bahasa', type: 'text' }
+                ]}]
+            },
+            klasifikasi_ddc: {
+                title: 'Klasifikasi DDC', icon: 'fa-sitemap', tableName: 'klasifikasi_ddc',
+                sections: [{ title: 'Standar DDC', fields: [
+                    { label: 'Nomor DDC', db_field: 'nomor_ddc', type: 'text' },
+                    { label: 'Subject Heading', db_field: 'subject', type: 'text' }
+                ]}]
+            },
+            bibliografi: { 
+                title: 'Katalog Buku Dasar', icon: 'fa-book', tableName: 'buku_bibliografi',
+                sections: [
+                    { title: 'Data Standar MARC21/RDA', fields: [
+                        { label: 'ISBN/ISSN', db_field: 'isbn', type: 'text' }, 
+                        { label: 'Judul Utama', db_field: 'judul', type: 'text' }, 
+                        { label: 'Sub Judul / Judul Seri', db_field: 'sub_judul', type: 'text' },
+                        { label: 'Penulis Utama', db_field: 'penulis', type: 'text' },
+                        { label: 'Penerbit', db_field: 'penerbit', type: 'text' },
+                        { label: 'Tahun Terbit', db_field: 'tahun_terbit', type: 'number' },
+                        { label: 'Kota Terbit', db_field: 'kota_terbit', type: 'text' },
+                        { label: 'Edisi / Cetakan', db_field: 'edisi', type: 'text' }
+                    ]},
+                    { title: 'Fisik & Konten', fields: [
+                        { label: 'Jumlah Halaman', db_field: 'jumlah_halaman', type: 'number' },
+                        { label: 'Bahasa', db_field: 'bahasa', type: 'text' },
+                        { label: 'Sinopsis / Abstrak', db_field: 'sinopsis', type: 'textarea' },
+                        { label: 'Kata Kunci (Keywords)', db_field: 'kata_kunci', type: 'text' }
+                    ]}
+                ] 
+            },
+            katalog_marc21: {
+                title: 'Katalog MARC21', icon: 'fa-barcode', tableName: 'katalog_marc21',
+                sections: [{ title: 'Entri Katalog Berbasis MARC21', fields: [
+                    { label: '020 - ISBN', db_field: 'marc_020', type: 'text' },
+                    { label: '082 - DDC', db_field: 'marc_082', type: 'text' },
+                    { label: '100 - Penulis Utama', db_field: 'marc_100', type: 'text' },
+                    { label: '245 - Judul Lengkap', db_field: 'marc_245', type: 'text' },
+                    { label: '250 - Edisi', db_field: 'marc_250', type: 'text' },
+                    { label: '260 - Penerbitan', db_field: 'marc_260', type: 'text' },
+                    { label: '300 - Deskripsi Fisik', db_field: 'marc_300', type: 'text' }
+                ]}]
+            },
+            otoritas: {
+                title: 'Data Otoritas (Authority)', icon: 'fa-check-circle', tableName: 'otoritas',
+                sections: [{ title: 'Manajemen Data Otoritas', fields: [
+                    { label: 'Jenis Otoritas', db_field: 'jenis', type: 'select', options: ['Penulis', 'Subjek', 'Penerbit'] },
+                    { label: 'Nama Tajuk', db_field: 'nama_tajuk', type: 'text' },
+                    { label: 'Keterangan Tambahan', db_field: 'keterangan', type: 'textarea' }
+                ]}]
+            },
+            eksemplar: {
+                title: 'Data Eksemplar / Item', icon: 'fa-copy', tableName: 'eksemplar',
+                sections: [{ title: 'Detail Fisik Buku', fields: [
+                    { label: 'Nomor Induk Buku / Barcode', db_field: 'nomor_induk', type: 'text' },
+                    { label: 'Buku (ID/Judul)', db_field: 'buku_id', type: 'text' },
+                    { label: 'Tanggal Masuk', db_field: 'tanggal_masuk', type: 'date' },
+                    { label: 'Harga', db_field: 'harga', type: 'number' },
+                    { label: 'Sumber Dana (BOS/Hibah)', db_field: 'sumber_dana', type: 'text' },
+                    { label: 'Kondisi', db_field: 'kondisi', type: 'select', options: ['Baik', 'Rusak Ringan', 'Rusak Berat', 'Hilang'] },
+                    { label: 'Lokasi Rak', db_field: 'lokasi_rak', type: 'text' }
+                ]}]
+            },
+            buku_digital: {
+                title: 'Digital Library (E-Book)', icon: 'fa-tablet-alt', tableName: 'buku_digital',
+                sections: [{ title: 'File Digital', fields: [
+                    { label: 'Judul Dokumen', db_field: 'judul', type: 'text' },
+                    { label: 'Link File (PDF/EPUB/Video)', db_field: 'file_url', type: 'text' },
+                    { label: 'Hak Akses', db_field: 'akses', type: 'select', options: ['Publik', 'Hanya Anggota', 'Hanya Guru'] }
+                ]}]
+            },
+            peminjaman: {
+                title: 'Sirkulasi: Peminjaman', icon: 'fa-hand-holding-heart', tableName: 'peminjaman',
+                sections: [{ title: 'Transaksi Peminjaman', fields: [
+                    { label: 'Nomor Transaksi', db_field: 'no_transaksi', type: 'text' },
+                    { label: 'Barcode Anggota', db_field: 'anggota_id', type: 'text' },
+                    { label: 'Barcode Buku (Eksemplar)', db_field: 'eksemplar_id', type: 'text' },
+                    { label: 'Tanggal Pinjam', db_field: 'tgl_pinjam', type: 'date' },
+                    { label: 'Batas Kembali', db_field: 'batas_kembali', type: 'date' },
+                    { label: 'Status', db_field: 'status', type: 'select', options: ['Dipinjam', 'Dikembalikan', 'Terlambat'] }
+                ]}]
+            },
+            pengembalian: {
+                title: 'Sirkulasi: Pengembalian', icon: 'fa-undo', tableName: 'pengembalian',
+                sections: [{ title: 'Proses Pengembalian', fields: [
+                    { label: 'Nomor Transaksi Pinjam', db_field: 'no_transaksi', type: 'text' },
+                    { label: 'Tanggal Dikembalikan', db_field: 'tgl_kembali', type: 'date' },
+                    { label: 'Kondisi Buku Saat Kembali', db_field: 'kondisi', type: 'select', options: ['Baik', 'Rusak', 'Hilang'] },
+                    { label: 'Denda (Jika Ada)', db_field: 'denda', type: 'number' }
+                ]}]
+            },
+            denda: {
+                title: 'Manajemen Denda', icon: 'fa-money-bill-wave', tableName: 'denda',
+                sections: [{ title: 'Data Denda', fields: [
+                    { label: 'Nomor Transaksi', db_field: 'no_transaksi', type: 'text' },
+                    { label: 'Nominal Denda', db_field: 'nominal', type: 'number' },
+                    { label: 'Status Pembayaran', db_field: 'status', type: 'select', options: ['Belum Lunas', 'Lunas'] }
+                ]}]
+            },
+            reservasi: {
+                title: 'Reservasi Buku', icon: 'fa-bookmark', tableName: 'reservasi',
+                sections: [{ title: 'Booking', fields: [
+                    { label: 'Anggota', db_field: 'anggota', type: 'text' },
+                    { label: 'Buku', db_field: 'buku', type: 'text' },
+                    { label: 'Status', db_field: 'status', type: 'select', options: ['Menunggu', 'Diambil', 'Batal'] }
+                ]}]
+            },
+            pengadaan: {
+                title: 'Pengadaan Buku', icon: 'fa-shopping-cart', tableName: 'pengadaan',
+                sections: [{ title: 'Data Pembelian', fields: [
+                    { label: 'Nomor Pengadaan', db_field: 'no_pengadaan', type: 'text' },
+                    { label: 'Supplier', db_field: 'supplier', type: 'text' },
+                    { label: 'Tanggal', db_field: 'tanggal', type: 'date' },
+                    { label: 'Total Item', db_field: 'total_item', type: 'number' },
+                    { label: 'Total Harga', db_field: 'total_harga', type: 'number' }
+                ]}]
+            },
+            donasi: {
+                title: 'Hibah / Donasi', icon: 'fa-gift', tableName: 'donasi',
+                sections: [{ title: 'Penerimaan Hibah', fields: [
+                    { label: 'Nama Donatur', db_field: 'donatur', type: 'text' },
+                    { label: 'Instansi / Alamat', db_field: 'instansi', type: 'text' },
+                    { label: 'Jumlah Buku', db_field: 'jumlah', type: 'number' }
+                ]}]
+            },
+            stock_opname: {
+                title: 'Stock Opname', icon: 'fa-boxes', tableName: 'stock_opname',
+                sections: [{ title: 'Rekonsiliasi', fields: [
+                    { label: 'Tanggal Opname', db_field: 'tanggal', type: 'date' },
+                    { label: 'Petugas', db_field: 'petugas', type: 'text' },
+                    { label: 'Catatan / Hasil', db_field: 'catatan', type: 'textarea' }
+                ]}]
+            },
+            pengunjung: {
+                title: 'Buku Tamu / Pengunjung', icon: 'fa-walking', tableName: 'pengunjung',
+                sections: [{ title: 'Data Kunjungan', fields: [
+                    { label: 'Nama Pengunjung / Anggota', db_field: 'nama', type: 'text' },
+                    { label: 'Kelas / Instansi', db_field: 'kelas', type: 'text' },
+                    { label: 'Tujuan Kunjungan', db_field: 'tujuan', type: 'text' },
+                    { label: 'Waktu Kunjungan', db_field: 'waktu', type: 'date' }
+                ]}]
+            },
+            usulan_buku: {
+                title: 'Usulan Buku Baru', icon: 'fa-lightbulb', tableName: 'usulan_buku',
+                sections: [{ title: 'Request Buku', fields: [
+                    { label: 'Pengusul', db_field: 'pengusul', type: 'text' },
+                    { label: 'Judul Buku', db_field: 'judul', type: 'text' },
+                    { label: 'Penerbit/Penulis', db_field: 'keterangan', type: 'text' },
+                    { label: 'Status', db_field: 'status', type: 'select', options: ['Diusulkan', 'Disetujui', 'Ditolak'] }
+                ]}]
+            },
+            konfig_sirkulasi: {
+                title: 'Konfigurasi Sirkulasi', icon: 'fa-cogs', tableName: 'konfig_sirkulasi',
+                sections: [{ title: 'Aturan Peminjaman', fields: [
+                    { label: 'Jenis Anggota', db_field: 'jenis_anggota', type: 'select', options: ['Siswa', 'Guru', 'Staf', 'Umum'] },
+                    { label: 'Maksimal Pinjam (Buku)', db_field: 'maks_pinjam', type: 'number' },
+                    { label: 'Lama Pinjam (Hari)', db_field: 'lama_pinjam', type: 'number' },
+                    { label: 'Denda Keterlambatan (Rp/Hari)', db_field: 'denda_per_hari', type: 'number' }
+                ]}]
+            },
+            hak_akses: {
+                title: 'Hak Akses & Peran', icon: 'fa-key', tableName: 'hak_akses',
+                sections: [{ title: 'Manajemen Role Pengguna', fields: [
+                    { label: 'Nama Peran (Role)', db_field: 'nama_role', type: 'text' },
+                    { label: 'Modul Diizinkan (Pisahkan dgn koma)', db_field: 'modul_diizinkan', type: 'textarea' }
+                ]}]
+            },
+            template_cetak: {
+                title: 'Template Cetak', icon: 'fa-id-badge', tableName: 'template_cetak',
+                sections: [{ title: 'Desain Kartu & Label', fields: [
+                    { label: 'Jenis Template', db_field: 'jenis', type: 'select', options: ['Kartu Anggota', 'Label Buku', 'Barcode Buku', 'QR Code'] },
+                    { label: 'Nama Template', db_field: 'nama', type: 'text' },
+                    { label: 'Desain (Struktur HTML/CSS)', db_field: 'desain', type: 'textarea' }
+                ]}]
+            },
+            backup_restore: {
+                title: 'Backup & Restore', icon: 'fa-database', tableName: 'backup_restore',
+                sections: [{ title: 'Riwayat Pencadangan Database', fields: [
+                    { label: 'Tanggal Backup', db_field: 'tanggal', type: 'date' },
+                    { label: 'Nama File', db_field: 'nama_file', type: 'text' },
+                    { label: 'URL / Link File', db_field: 'file_url', type: 'text' },
+                    { label: 'Status', db_field: 'status', type: 'select', options: ['Berhasil', 'Gagal', 'Sedang Diproses'] }
+                ]}]
+            },
+            audit_log: {
+                title: 'Audit Log Sistem', icon: 'fa-history', tableName: 'audit_log',
+                sections: [{ title: 'Catatan Aktivitas Admin', fields: [
+                    { label: 'Nama / ID Pengguna', db_field: 'pengguna', type: 'text' },
+                    { label: 'Modul Sistem', db_field: 'modul', type: 'text' },
+                    { label: 'Tindakan (Aksi)', db_field: 'aksi', type: 'text' },
+                    { label: 'Waktu Kejadian', db_field: 'waktu', type: 'date' }
+                ]}]
+            },
+            integrasi_api: {
+                title: 'Integrasi Sistem (API)', icon: 'fa-plug', tableName: 'integrasi_api',
+                sections: [{ title: 'Koneksi Dapodik / EMIS / WA', fields: [
+                    { label: 'Nama Sistem Integrasi', db_field: 'nama_sistem', type: 'select', options: ['Dapodik', 'EMIS', 'Sistem Akademik', 'WhatsApp Gateway', 'Google Workspace'] },
+                    { label: 'Endpoint URL', db_field: 'endpoint_url', type: 'text' },
+                    { label: 'API Key / Token', db_field: 'api_key', type: 'text' },
+                    { label: 'Status Koneksi', db_field: 'status', type: 'select', options: ['Terhubung', 'Terputus', 'Menunggu Otorisasi'] }
+                ]}]
+            },
+            pengaturan_web: {
+                title: 'Pengaturan OPAC & Web', icon: 'fa-globe', tableName: 'pengaturan_web',
+                sections: [{ title: 'Tampilan Katalog Publik', fields: [
+                    { label: 'Nama Portal / Web', db_field: 'nama_portal', type: 'text' },
+                    { label: 'Deskripsi Singkat', db_field: 'deskripsi', type: 'textarea' },
+                    { label: 'URL Logo', db_field: 'logo_url', type: 'text' },
+                    { label: 'Tema Tampilan', db_field: 'tema', type: 'select', options: ['Biru (Default)', 'Hijau Alam', 'Gelap (Dark Mode)'] }
+                ]}]
+            },
+            statistik_analitik: {
+                title: 'Statistik & Analitik', icon: 'fa-chart-pie', tableName: 'statistik_analitik',
+                sections: [{ title: 'Data Laporan Bulanan', fields: [
+                    { label: 'Periode (Bulan)', db_field: 'periode', type: 'date' },
+                    { label: 'Total Pengunjung', db_field: 'total_pengunjung', type: 'number' },
+                    { label: 'Buku Terpopuler', db_field: 'buku_populer', type: 'text' },
+                    { label: 'Anggota Teraktif', db_field: 'anggota_aktif', type: 'text' }
+                ]}]
+            },
+            notifikasi: {
+                title: 'Sistem Notifikasi', icon: 'fa-bell', tableName: 'notifikasi',
+                sections: [{ title: 'Broadcast Pesan', fields: [
+                    { label: 'Judul Notifikasi', db_field: 'judul', type: 'text' },
+                    { label: 'Isi Pesan', db_field: 'pesan', type: 'textarea' },
+                    { label: 'Tujuan (Anggota/Semua)', db_field: 'tujuan', type: 'text' }
+                ]}]
+            },
+            laporan: {
+                title: 'Generator Laporan', icon: 'fa-file-pdf', tableName: 'laporan_log',
+                sections: [{ title: 'Export Data', fields: [
+                    { label: 'Jenis Laporan', db_field: 'jenis', type: 'select', options: ['Laporan Peminjaman', 'Laporan Anggota', 'Laporan Katalog', 'Laporan Denda', 'Statistik Kunjungan'] },
+                    { label: 'Periode Awal', db_field: 'periode_awal', type: 'date' },
+                    { label: 'Periode Akhir', db_field: 'periode_akhir', type: 'date' }
+                ]}]
+            }
+        };
+
+        const SIDEBAR_GROUPS = [
+            { name: 'Menu Utama', items: ['dashboard', 'profil'] },
+            { name: 'Sirkulasi & Layanan', items: ['peminjaman', 'pengembalian', 'denda', 'reservasi', 'pengunjung'] },
+            { name: 'Katalog & Koleksi', items: ['bibliografi', 'katalog_marc21', 'otoritas', 'eksemplar', 'buku_digital', 'usulan_buku'] },
+            { name: 'Master Data', items: ['pengguna', 'anggota', 'guru', 'penerbit', 'penulis', 'kategori', 'rak', 'bahasa', 'klasifikasi_ddc'] },
+            { name: 'Inventarisasi', items: ['pengadaan', 'donasi', 'stock_opname'] },
+            { name: 'Sistem, API & Log', items: ['konfig_sirkulasi', 'hak_akses', 'template_cetak', 'integrasi_api', 'pengaturan_web', 'backup_restore', 'audit_log', 'statistik_analitik', 'notifikasi', 'laporan'] }
+        ];
+
+        let currentModule = 'dashboard';
+        let currentMode = 'list';
+        let activeUser = null;
+        let activeTableData = []; 
+        let editingId = null;
+
+        // ==========================================
+        // 3. CORE LOGIC & SUPABASE FETCHING
+        // ==========================================
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const u = document.getElementById('login-user').value;
+            const p = document.getElementById('login-pass').value;
+            const btn = document.getElementById('btn-login');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memeriksa...';
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('users')
+                    .select('*')
+                    .eq('username', u)
+                    .eq('password', p)
+                    .single();
+
+                if (error || !data) {
+                    showToast('Username atau password salah!', 'error');
+                } else {
+                    activeUser = data;
+                    document.getElementById('sidebar-user-name').innerText = data.nama_lengkap || 'Admin';
+                    switchAppMode('admin');
+                    showToast(`Login berhasil! Selamat datang, ${data.nama_lengkap}`, 'success');
+                }
+            } catch (err) {
+                showToast('Koneksi Supabase Gagal.', 'error');
+            } finally {
+                btn.innerHTML = 'Masuk';
+            }
+        });
+
+        let searchTimeout;
+        function handlePublicSearch(query) {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => { loadPublicCatalog(query); }, 500);
+        }
+
+        async function loadPublicCatalog(searchQuery = '') {
+            const grid = document.getElementById('public-katalog-grid');
+            grid.innerHTML = '<div class="col-span-full py-16 text-center text-gray-500"><i class="fas fa-circle-notch fa-spin text-4xl mb-3"></i><p>Menghubungkan ke Supabase...</p></div>';
+            
+            let query = supabaseClient.from('buku_bibliografi').select('*').order('created_at', { ascending: false });
+            if (searchQuery) query = query.ilike('judul', `%${searchQuery}%`); 
+
+            const { data, error } = await query;
+            
+            if (error) {
+                grid.innerHTML = `<div class="col-span-full py-16 text-center text-red-500">Gagal mengambil data dari Supabase.<br><small>${error.message}</small></div>`;
+                return;
+            }
+            if (data.length === 0) {
+                grid.innerHTML = `<div class="col-span-full py-16 text-center text-gray-500"><i class="fas fa-search text-5xl mb-4 text-gray-300"></i><br><span class="text-lg">Buku tidak ditemukan.</span></div>`;
+                return;
+            }
+
+            let html = '';
+            data.forEach(book => {
+                html += `
+                    <div class="border border-gray-200 rounded-sm overflow-hidden hover:shadow-lg transition-shadow bg-white flex flex-col h-full group fade-in">
+                        <div class="h-56 bg-gray-200 flex flex-col items-center justify-center border-b border-gray-200 relative group-hover:bg-gray-300 transition-colors">
+                            <i class="fas fa-book text-6xl text-gray-400"></i>
+                            <span class="absolute top-2 right-2 bg-[#28a745] text-white text-[10px] font-bold px-2 py-1 rounded-sm shadow-sm">Tersedia</span>
+                        </div>
+                        <div class="p-4 flex flex-col flex-grow">
+                            <h3 class="font-bold text-gray-800 text-base leading-tight mb-1 line-clamp-2">${book.judul || 'Tanpa Judul'}</h3>
+                            <div class="text-[11px] text-gray-600 mt-auto space-y-1">
+                                <p><i class="fas fa-user mr-1.5 w-3 text-center text-gray-400"></i> Pengarang: ${book.penulis || '-'}</p>
+                                <p><i class="fas fa-calendar mr-1.5 w-3 text-center text-gray-400"></i> Tahun: ${book.tahun_terbit || '-'}</p>
+                                <p><i class="fas fa-barcode mr-1.5 w-3 text-center text-gray-400"></i> ISBN: ${book.isbn || '-'}</p>
+                            </div>
+                        </div>
+                    </div>`;
+            });
+            grid.innerHTML = html;
+        }
+
+        async function switchModule(key) {
+            currentModule = key;
+            currentMode = 'list';
+            editingId = null;
+            
+            document.querySelectorAll('.sidebar-btn').forEach(btn => {
+                btn.classList.remove('bg-[#007bff]', 'text-white');
+                btn.classList.add('text-[#c2c7d0]');
+            });
+            const activeBtn = document.getElementById(`menu-btn-${key}`);
+            if(activeBtn) {
+                activeBtn.classList.add('bg-[#007bff]', 'text-white');
+                activeBtn.classList.remove('text-[#c2c7d0]');
+            }
+
+            const schema = SCHEMAS[key];
+            document.getElementById('page-title').innerText = schema.title;
+            document.getElementById('breadcrumb').innerText = `Dashboard / ${schema.title}`;
+
+            if (key === 'dashboard') {
+                document.getElementById('dashboard-view').classList.remove('hidden');
+                document.getElementById('dynamic-view').classList.add('hidden');
+                await loadDashboardData();
+            } else {
+                document.getElementById('dashboard-view').classList.add('hidden');
+                document.getElementById('dynamic-view').classList.remove('hidden');
+                document.getElementById('module-icon').className = `fas ${schema.icon}`;
+                document.getElementById('module-title').innerText = schema.title;
+                
+                await loadDynamicList();
+            }
+        }
+
+        async function loadDynamicList() {
+            elDynamicContent.innerHTML = '<div class="p-8 text-center text-gray-500"><i class="fas fa-circle-notch fa-spin text-3xl mb-3"></i><p>Mengambil dari Supabase...</p></div>';
+            const schema = SCHEMAS[currentModule];
+            
+            if(schema && schema.tableName) {
+                const { data, error } = await supabaseClient
+                    .from(schema.tableName)
+                    .select('*')
+                    .order('created_at', { ascending: false, nullsFirst: false });
+                
+                if (error) {
+                    showToast(`Tabel ${schema.tableName} belum ada di Supabase atau RLS memblokir.`, 'error');
+                    activeTableData = [];
+                } else {
+                    activeTableData = data;
+                }
+            }
+            renderDynamicView();
+        }
+
+        async function loadDashboardData() {
+            const b_res = await supabaseClient.from('buku_bibliografi').select('*', { count: 'exact', head: true });
+            document.getElementById('stat-koleksi').innerText = b_res.count !== null ? b_res.count : 0;
+            
+            const a_res = await supabaseClient.from('anggota').select('*', { count: 'exact', head: true });
+            document.getElementById('stat-anggota').innerText = a_res.count !== null ? a_res.count : 0;
+            
+            const e_res = await supabaseClient.from('eksemplar').select('*', { count: 'exact', head: true });
+            document.getElementById('stat-eksemplar').innerText = e_res.count !== null && e_res.count > 0 ? e_res.count : (b_res.count !== null ? b_res.count : 0);
+        }
+
+        // ==========================================
+        // 4. DYNAMIC CRUD
+        // ==========================================
+        const elDynamicContent = document.getElementById('dynamic-content');
+        const elToolbarBtns = document.getElementById('toolbar-buttons');
+
+        function renderDynamicView() {
+            const schema = SCHEMAS[currentModule];
+            if(currentMode === 'list') {
+                elToolbarBtns.innerHTML = `
+                    <button onclick="confirmAction('delete_all')" class="px-3 py-1.5 rounded-sm text-sm bg-red-600 hover:bg-red-700 text-white flex items-center space-x-1 shadow-sm mr-2"><i class="fas fa-trash"></i> <span>Hapus Semua</span></button>
+                    <button onclick="setMode('form')" class="px-3 py-1.5 rounded-sm text-sm bg-[#007bff] hover:bg-[#0056b3] text-white flex items-center space-x-1 shadow-sm"><i class="fas fa-plus"></i> <span>Tambah Data</span></button>
+                `;
+                renderTable(schema);
+            } else {
+                elToolbarBtns.innerHTML = `<button onclick="switchModule(currentModule)" class="px-3 py-1.5 rounded-sm text-sm bg-gray-600 text-white flex items-center shadow-sm"><i class="fas fa-arrow-left mr-1"></i> Batal</button>`;
+                renderForm(schema);
+            }
+        }
+
+        function setMode(mode, id = null) { currentMode = mode; editingId = id; renderDynamicView(); }
+
+        function renderTable(schema) {
+            const columns = schema.sections[0].fields.slice(0, 5); 
+            
+            let html = `
+                <div class="overflow-x-auto border border-gray-200 rounded-sm">
+                    <table class="min-w-full text-left text-sm border-collapse">
+                        <thead class="bg-[#f4f6f9] text-gray-700 border-b border-gray-200">
+                            <tr>
+                                <th class="p-3 w-12 text-center border-r font-bold">No</th>`;
+            columns.forEach(col => { html += `<th class="p-3 border-r font-bold uppercase text-[11px]">${col.label}</th>`; });
+            html += `<th class="p-3 text-center w-24 font-bold">Aksi</th></tr></thead><tbody>`;
+            
+            if(activeTableData.length === 0) {
+                html += `<tr><td colspan="${columns.length + 2}" class="p-8 text-center text-gray-500">Tidak ada data di database.</td></tr>`;
+            } else {
+                activeTableData.forEach((row, idx) => {
+                    html += `<tr class="border-b even:bg-[#f9fafb] hover:bg-gray-50">
+                                <td class="p-3 text-center border-r">${idx + 1}</td>`;
+                    columns.forEach(col => { html += `<td class="p-3 border-r truncate max-w-[150px]">${row[col.db_field] || '-'}</td>`; });
+                    html += `   <td class="p-3 text-center">
+                                    <button onclick="setMode('form', '${row.id}')" class="bg-[#ffc107] text-white px-2 py-1 rounded-sm text-xs shadow-sm mr-1"><i class="fas fa-edit"></i></button>
+                                    <button onclick="confirmAction('delete_single', '${row.id}')" class="bg-[#dc3545] text-white px-2 py-1 rounded-sm text-xs shadow-sm"><i class="fas fa-trash"></i></button>
+                                </td>
+                             </tr>`;
+                });
+            }
+            html += `</tbody></table></div>`;
+            elDynamicContent.innerHTML = html;
+        }
+
+        function renderForm(schema) {
+            let rowData = {};
+            if(editingId) rowData = activeTableData.find(r => r.id === editingId) || {};
+
+            let html = `<form id="crud-form" onsubmit="saveData(event)" class="max-w-4xl mx-auto pb-8 space-y-6">`;
+            schema.sections.forEach((sec) => {
+                html += `<div class="border border-gray-200 rounded-sm shadow-sm">
+                            <div class="bg-[#f4f6f9] px-4 py-3 border-b"><h3 class="text-sm font-bold uppercase text-gray-700">${sec.title}</h3></div>
+                            <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">`;
+                
+                sec.fields.forEach((field) => {
+                    const val = rowData[field.db_field] || '';
+                    const inputCls = "w-full px-3 py-2 border border-gray-300 rounded-sm focus:border-blue-500 focus:ring-0 text-sm outline-none bg-white";
+                    let inputEl = '';
+
+                    if(field.type === 'textarea') {
+                        inputEl = `<textarea data-db="${field.db_field}" rows="3" class="${inputCls}">${val}</textarea>`;
+                    } else if(field.type === 'select') {
+                        inputEl = `<select data-db="${field.db_field}" class="${inputCls}"><option value="">-- Pilih --</option>`;
+                        field.options.forEach(opt => { inputEl += `<option value="${opt}" ${val === opt ? 'selected' : ''}>${opt}</option>`; });
+                        inputEl += `</select>`;
+                    } else {
+                        inputEl = `<input type="${field.type}" data-db="${field.db_field}" class="${inputCls}" value="${val}">`;
+                    }
+                    const spanClass = field.type === 'textarea' ? 'col-span-1 md:col-span-2' : '';
+                    html += `<div class="${spanClass}"><label class="block text-xs font-bold text-gray-600 mb-1 uppercase tracking-wider">${field.label}</label>${inputEl}</div>`;
+                });
+                html += `</div></div>`;
+            });
+            html += `<div class="flex justify-end space-x-2 pt-2 sticky bottom-0 bg-white p-4 border-t border-gray-200 shadow-md rounded-b-sm">
+                        <button type="submit" id="btn-save" class="px-6 py-2.5 bg-[#28a745] hover:bg-[#218838] text-white rounded-sm text-sm font-bold shadow-sm transition-colors"><i class="fas fa-save mr-1"></i> Simpan ke Database</button>
+                    </div></form>`;
+            elDynamicContent.innerHTML = html;
+        }
+
+        async function saveData(e) {
+            e.preventDefault();
+            const schema = SCHEMAS[currentModule];
+            const btn = document.getElementById('btn-save');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menyimpan...';
+            
+            const inputs = document.getElementById('crud-form').querySelectorAll('input, select, textarea');
+            const payload = {};
+            inputs.forEach(input => {
+                const dbField = input.getAttribute('data-db');
+                if(dbField && input.value !== '') { payload[dbField] = input.value; }
+            });
+
+            try {
+                if(editingId) {
+                    const { error } = await supabaseClient.from(schema.tableName).update(payload).eq('id', editingId);
+                    if(error) throw error;
+                    showToast('Data berhasil diperbarui', 'success');
+                } else {
+                    const { error } = await supabaseClient.from(schema.tableName).insert([payload]);
+                    if(error) throw error;
+                    showToast('Data baru berhasil disimpan', 'success');
+                }
+                await loadDynamicList();
+            } catch(error) {
+                showToast(`Gagal menyimpan: Pastikan tabel ${schema.tableName} sudah dibuat di Supabase SQL`, 'error');
+            } finally {
+                btn.innerHTML = '<i class="fas fa-save mr-1"></i> Simpan ke Database';
+            }
+        }
+
+        // ==========================================
+        // 5. UTILITIES
+        // ==========================================
+        let pendingAction = null;
+        let pendingId = null;
+
+        function confirmAction(action, id = null) { 
+            pendingAction = action;
+            pendingId = id; 
+            
+            const modalTitle = document.getElementById('modal-title');
+            const confirmMsg = document.getElementById('confirm-message');
+            
+            if (action === 'delete_all') {
+                modalTitle.innerText = "Hapus Semua Data";
+                confirmMsg.innerText = "Apakah Anda yakin ingin menghapus SEMUA data pada tabel ini? Tindakan ini tidak dapat dibatalkan!";
+            } else {
+                modalTitle.innerText = "Konfirmasi Tindakan";
+                confirmMsg.innerText = "Apakah Anda yakin ingin menghapus data ini?";
+            }
+            
+            document.getElementById('confirm-modal').classList.remove('hidden'); 
+        }
+
+        function closeConfirmModal() { 
+            document.getElementById('confirm-modal').classList.add('hidden'); 
+            pendingAction = null;
+            pendingId = null; 
+        }
+
+        document.getElementById('confirm-btn').addEventListener('click', async () => {
+            const schema = SCHEMAS[currentModule];
+            
+            if (pendingAction === 'delete_single' && pendingId && schema.tableName) {
+                closeConfirmModal();
+                try {
+                    const { error } = await supabaseClient.from(schema.tableName).delete().eq('id', pendingId);
+                    if(error) throw error;
+                    showToast('Data terhapus permanen', 'info');
+                    await loadDynamicList();
+                } catch(error) { showToast(`Gagal hapus: ${error.message}`, 'error'); }
+            } else if (pendingAction === 'delete_all' && schema.tableName) {
+                closeConfirmModal();
+                try {
+                    // Supabase requires a filter for delete operations, so we match all records where id is not null
+                    const { error } = await supabaseClient.from(schema.tableName).delete().not('id', 'is', null);
+                    if(error) throw error;
+                    showToast('Semua data berhasil dihapus', 'info');
+                    await loadDynamicList();
+                } catch(error) { showToast(`Gagal hapus semua data: ${error.message}`, 'error'); }
+            }
+        });
+
+        function showToast(msg, type = 'info') {
+            const t = document.createElement('div');
+            const c = type === 'success' ? 'bg-[#28a745]' : type === 'error' ? 'bg-[#dc3545]' : 'bg-[#17a2b8]';
+            t.className = `${c} text-white px-4 py-2 rounded-sm shadow-md text-sm fade-in`;
+            t.innerHTML = msg;
+            document.getElementById('toast-container').appendChild(t);
+            setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3500);
+        }
+
+        function switchAppMode(mode) {
+            document.getElementById('public-view').classList.add('hidden');
+            document.getElementById('login-view').classList.add('hidden');
+            document.getElementById('app-view').classList.add('hidden');
+
+            if (mode === 'public') { 
+                document.getElementById('public-view').classList.remove('hidden'); 
+                document.getElementById('public-search').value = '';
+                loadPublicCatalog(); 
+            }
+            else if (mode === 'login') { document.getElementById('login-view').classList.remove('hidden'); }
+            else if (mode === 'admin') {
+                document.getElementById('app-view').classList.remove('hidden');
+                let html = '';
+                SIDEBAR_GROUPS.forEach(g => {
+                    html += `<div class="mb-2"><h4 class="px-4 py-2 text-[11px] font-bold text-[#869099] uppercase tracking-wider">${g.name}</h4><ul class="space-y-1">`;
+                    g.items.forEach(k => {
+                        const s = SCHEMAS[k];
+                        if(s) html += `<li><button onclick="switchModule('${k}')" id="menu-btn-${k}" class="sidebar-btn w-full flex items-center space-x-3 px-3 py-2 rounded-sm transition-colors text-sm text-[#c2c7d0] hover:bg-[#494e53] hover:text-white text-left"><i class="fas ${s.icon} w-5 text-center"></i> <span>${s.title}</span></button></li>`;
+                    });
+                    html += `</ul></div>`;
+                });
+                document.getElementById('sidebar-nav').innerHTML = html;
+                switchModule('dashboard');
+            }
+        }
+
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('-translate-x-full'); }
+        function logout() { 
+            switchAppMode('public'); 
+            activeUser = null; 
+    
+            // Mengosongkan value input secara paksa
+            document.getElementById('login-user').value = '';
+            document.getElementById('login-pass').value = '';
+    
+            // Mereset form secara keseluruhan (termasuk checkbox Remember Me)
+            document.getElementById('login-form').reset();
+    
+            showToast('Berhasil Keluar', 'info'); 
+        }
+        document.addEventListener('DOMContentLoaded', () => { switchAppMode('public'); });
+    </script>
+</body>
+</html>
