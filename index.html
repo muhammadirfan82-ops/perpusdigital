@@ -104,7 +104,11 @@
     </div>
 
     <!-- MAIN APP SCREEN (Admin) -->
-    <div id="app-view" class="hidden w-full h-full flex flex-col md:flex-row">
+    <div id="app-view" class="hidden w-full h-full flex flex-col md:flex-row relative">
+        
+        <!-- BACKDROP UNTUK MOBILE SIDEBAR -->
+        <div id="sidebar-backdrop" class="fixed inset-0 bg-black/50 z-30 hidden md:hidden fade-in" onclick="toggleSidebar()"></div>
+
         <!-- SIDEBAR -->
         <aside id="sidebar" class="w-64 h-full bg-[#343a40] flex flex-col shadow-xl flex-shrink-0 z-40 transition-transform duration-300 absolute md:relative -translate-x-full md:translate-x-0">
             <div class="h-14 flex items-center px-4 border-b border-[#4b545c] bg-[#343a40]">
@@ -909,7 +913,14 @@
             }
         }
 
-        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('-translate-x-full'); }
+        function toggleSidebar() { 
+            document.getElementById('sidebar').classList.toggle('-translate-x-full'); 
+            const backdrop = document.getElementById('sidebar-backdrop');
+            if (backdrop) {
+                backdrop.classList.toggle('hidden');
+            }
+        }
+        
         function logout() { 
             switchAppMode('public'); 
             activeUser = null; 
